@@ -1,3 +1,10 @@
+# Batas ukuran log tiap container: maksimal 10 MB per file, 3 file bergilir (total <= 30 MB).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: mysql:8.0
@@ -14,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 30s
+    logging: *default-logging
     networks:
       - pustaka-net
 
@@ -39,10 +48,20 @@ services:
       SESSION_DRIVER: file
       CACHE_STORE: file
       QUEUE_CONNECTION: sync
-      LOG_CHANNEL: stderr
+      LOG_CHANNEL: stdout
+      LOG_LEVEL: info
     command: sh -c "php artisan migrate --force && exec frankenphp run --config /etc/caddy/Caddyfile --adapter caddyfile"
     ports:
       - "8000:8000"
+    # Memanggil /api/health sungguhan: 200 = sehat, 503 = db atau cache bermasalah.
+    # file_get_contents() mengembalikan false pada status 4xx/5xx, sehingga check gagal.
+    healthcheck:
+      test: ["CMD", "php", "-r", "ini_set('default_socket_timeout', 4); exit(@file_get_contents('http://127.0.0.1:8000/api/health') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    logging: *default-logging
     networks:
       - pustaka-net
 
@@ -57,6 +76,13 @@ services:
       - backend
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
     networks:
       - pustaka-net
 
