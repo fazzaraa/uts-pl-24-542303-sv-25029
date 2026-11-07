@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Book;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class BookController extends Controller
@@ -37,6 +38,15 @@ class BookController extends Controller
     {
         $book = $request->user()->books()->create($request->validate($this->rules()));
 
+        // Hanya id dan status; judul, penulis, dan catatan tidak dicatat.
+        Log::info('book.created', [
+            'actor' => $request->user()->id,
+            'action' => 'menyimpan buku baru',
+            'cause' => 'pengguna menambah buku ke koleksinya',
+            'book_id' => $book->id,
+            'status' => $book->status,
+        ]);
+
         return response()->json($book, 201);
     }
 
@@ -56,6 +66,13 @@ class BookController extends Controller
     public function destroy(Request $request, int $id): JsonResponse
     {
         $this->findOwned($request, $id)->delete();
+
+        Log::info('book.deleted', [
+            'actor' => $request->user()->id,
+            'action' => 'menghapus buku',
+            'cause' => 'pengguna menghapus buku miliknya',
+            'book_id' => $id,
+        ]);
 
         return response()->json(['message' => 'Buku dihapus.']);
     }
