@@ -1,0 +1,14 @@
+groups:
+  - name: pustaka-mini
+    rules:
+      - alert: LayananMati
+        # up bernilai 0 bila Prometheus gagal mengambil metrik dari target.
+        expr: up == 0
+        # Harus mati terus-menerus 1 menit supaya satu scrape yang gagal sesekali tidak membunyikan alarm.
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Layanan {{ $labels.job }} tidak merespons"
+          description: "Target {{ $labels.instance }} (job {{ $labels.job }}) tidak dapat di-scrape selama lebih dari 1 menit."
+          tindakan_pertama: "Jalankan 'docker compose ps' untuk melihat status {{ $labels.job }}, lalu 'docker compose logs {{ $labels.job }} --tail 50' untuk membaca penyebabnya sebelum me-restart dengan 'docker compose start {{ $labels.job }}'."

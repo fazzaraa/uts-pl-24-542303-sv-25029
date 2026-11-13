@@ -40,6 +40,18 @@ docker compose ps
 
 Data basis data disimpan di volume `db_data` dan tetap ada setelah `docker compose down` (jangan memakai `-v`).
 
+## Pemantauan (Prometheus, Grafana, cAdvisor, node-exporter)
+
+Tambahkan `GRAFANA_ADMIN_PASSWORD` (bukan `admin`) ke file `.env`, lalu jalankan `docker compose up -d --build`.
+
+| Layanan | Alamat | Fungsi |
+|---|---|---|
+| Prometheus | http://localhost:9090 (`/targets`, `/alerts`) | mengumpulkan metrik dan mengevaluasi alarm |
+| Grafana | http://localhost:3000 | dashboard "Pustaka Mini - Kesehatan Aplikasi" |
+| cAdvisor / node-exporter | hanya di jaringan compose | CPU dan memori container / host |
+
+Konfigurasi ada di folder `monitoring/` (`prometheus.yml`, `alerts.yml`, `grafana/`). Aplikasi mengekspos jumlah permintaan di `GET /api/metrics`.
+
 ## Menjalankan test backend
 
 ```bash

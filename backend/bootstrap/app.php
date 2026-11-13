@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CountRequests;
 use App\Http\Middleware\RequestContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Application;
@@ -18,9 +19,20 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         // Menempelkan request_id, method, dan path ke setiap baris log pada request API.
-        $middleware->api(prepend: [RequestContext::class]);
+        $middleware->api(prepend: [RequestContext::class, CountRequests::class]);
+
+        // API tidak punya halaman login: tamu tanpa token tidak dialihkan, cukup dibalas 401.
+        // Tanpa ini, Laravel mencari rute 'login' yang tidak ada dan berujung 500.
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Semua rute /api selalu dibalas JSON. Tanpa ini, permintaan tanpa header
+        // 'Accept: application/json' dan tanpa token berujung 500 (Laravel mencoba
+        // mengalihkan ke rute 'login' yang tidak ada), padahal seharusnya 401.
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request, \Throwable $e) => $request->is('api/*') || $request->expectsJson()
+        );
+
         // Validasi gagal (422): catat nama kolom dan jenis aturan yang dilanggar,
         // TANPA nilai yang dikirim pengguna (bisa berisi password atau data pribadi).
         $exceptions->render(function (ValidationException $e, Request $request) {
