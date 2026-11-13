@@ -86,8 +86,82 @@ services:
     networks:
       - pustaka-net
 
+  # ---------------------------------------------------------------- Pemantauan (P11)
+  # Versi image dikunci (bukan :latest) supaya hasilnya sama di setiap mesin.
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"   # hanya bisa dibuka dari komputer sendiri
+    depends_on:
+      - cadvisor
+      - node-exporter
+      - backend
+    logging: *default-logging
+    networks:
+      - pustaka-net
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      # Password diambil dari .env (tidak ikut ter-commit); compose berhenti bila kosong.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?isi GRAFANA_ADMIN_PASSWORD di file .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    logging: *default-logging
+    networks:
+      - pustaka-net
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.5
+    restart: unless-stopped
+    # cAdvisor membaca cgroup dan data Docker milik host, jadi perlu mount read-only
+    # dan privileged agar bisa menghitung per container (khususnya di Docker Desktop).
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    logging: *default-logging
+    networks:
+      - pustaka-net
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro
+    logging: *default-logging
+    networks:
+      - pustaka-net
+
 volumes:
   db_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   pustaka-net:
